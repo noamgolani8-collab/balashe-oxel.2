@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>משחק הבלש - שלב הסיכום</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #fdfdfd;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* תפריט בחירה */
+        #setup-menu {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .code-btn {
+            width: 70px; height: 70px; margin: 10px;
+            font-size: 30px; font-weight: bold; cursor: pointer;
+            border: 2px solid #ddd; border-radius: 50%; background: #fff;
+        }
+
+        /* לוח המשחק */
+        #game-board {
+            display: none;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            width: 190px; height: 190px;
+            perspective: 1000px;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%; height: 100%;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+            cursor: pointer;
+        }
+
+        .card.flipped .card-inner { transform: rotateY(180deg); }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%; height: 100%;
+            backface-visibility: hidden;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-front {
+            border: 2px solid #eee;
+            font-size: 60px;
+            font-weight: bold;
+            color: rgba(0,0,0,0.1);
+        }
+
+        .card-back {
+            background-image: url('background.jpg');
+            background-repeat: no-repeat;
+            background-size: 320% 380%; 
+            transform: rotateY(180deg);
+            background-color: white;
+            border: 2px solid #3498db;
+        }
+
+        /* מיקומי חיתוך מהתמונה המקורית */
+        .pos-0 { background-position: 98% 78%; } .pos-1 { background-position: 50% 78%; } .pos-2 { background-position: 2% 78%; }  
+        .pos-3 { background-position: 98% 41%; } .pos-4 { background-position: 50% 41%; } .pos-5 { background-position: 2% 41%; }  
+        .pos-6 { background-position: 98% 5%; }  .pos-7 { background-position: 50% 5%; }  .pos-8 { background-position: 2% 5%; }   
+
+        /* כפתור מעבר למתנה */
+        #summary-btn {
+            display: none;
+            padding: 15px 40px;
+            font-size: 22px;
+            font-weight: bold;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+            animation: grow 1.5s infinite;
+        }
+
+        @keyframes grow { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+        /* סיום */
+        #final-screen { display: none; text-align: center; }
+        #gift-box { font-size: 180px; cursor: pointer; animation: bounce 1s infinite; display: inline-block; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+        
+        #prize-image {
+            width: 350px; height: 350px;
+            object-fit: cover;
+            border-radius: 30px;
+            border: 10px solid white;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            display: none;
+        }
+
+        canvas { position: fixed; top: 0; left: 0; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="setup-menu">
+        <h3>בחר מאכל סודי:</h3>
+        <button class="code-btn" onclick="init('apple')">ת</button>
+        <button class="code-btn" onclick="init('strawberries')">ת'</button>
+        <button class="code-btn" onclick="init('lettuce')">ח</button>
+    </div>
+
+    <div id="game-board"></div>
+    
+    <button id="summary-btn" onclick="showGiftPhase()">סיימנו לסכם? לחצו למתנה! 🎁</button>
+
+    <div id="final-screen">
+        <div id="gift-box" onclick="revealPrize()">🎁</div>
+        <img id="prize-image" src="">
+        <br>
+        <button onclick="location.reload()" style="margin-top:20px; cursor:pointer;">משחק חדש</button>
+    </div>
+
+    <canvas id="c"></canvas>
+
+    <script>
+        let prize = '';
+        let count = 0;
+        const colors = ['#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', '#FFB7B2'];
+
+        function init(type) {
+            prize = type;
+            document.getElementById('setup-menu').style.display = 'none';
+            const board = document.getElementById('game-board');
+            board.style.display = 'grid';
+            for(let i=0; i<9; i++) {
+                const c = document.createElement('div');
+                c.className = 'card';
+                c.innerHTML = `<div class="card-inner" onclick="flip(this)">
+                                 <div class="card-front" style="background-color:${colors[i]}">${i+1}</div>
+                                 <div class="card-back pos-${i}"></div>
+                               </div>`;
+                board.appendChild(c);
+            }
+        }
+
+        function flip(el) {
+            if(!el.parentElement.classList.contains('flipped')) {
+                el.parentElement.classList.add('flipped');
+                count++;
+                if(count === 9) {
+                    // במקום לעבור מסך, מציגים את כפתור הסיכום
+                    setTimeout(() => {
+                        document.getElementById('summary-btn').style.display = 'block';
+                    }, 800);
+                }
+            }
+        }
+
+        function showGiftPhase() {
+            document.getElementById('game-board').style.display = 'none';
+            document.getElementById('summary-btn').style.display = 'none';
+            document.getElementById('final-screen').style.display = 'block';
+        }
+
+        function revealPrize() {
+            document.getElementById('gift-box').style.display = 'none';
+            const img = document.getElementById('prize-image');
+            img.src = `${prize}.jpg`;
+            img.style.display = 'inline-block';
+            startConfetti();
+        }
+
+        function startConfetti() {
+            const canvas = document.getElementById('c');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+            let parts = [];
+            for(let i=0; i<150; i++) parts.push({x:canvas.width/2, y:canvas.height/2, dx:(Math.random()-0.5)*20, dy:(Math.random()-0.5)*20, c:colors[Math.floor(Math.random()*9)]});
+            function frame() {
+                ctx.clearRect(0,0,canvas.width, canvas.height);
+                parts.forEach(p => { p.x+=p.dx; p.y+=p.dy; p.dy+=0.4; ctx.fillStyle=p.c; ctx.fillRect(p.x,p.y,10,10); });
+                requestAnimationFrame(frame);
+            }
+            frame();
+        }
+    </script>
+</body>
+</html>
